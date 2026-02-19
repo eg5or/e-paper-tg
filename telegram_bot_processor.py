@@ -63,9 +63,40 @@ user_client = None
 def is_group_chat_id(chat_id):
     return isinstance(chat_id, int) and chat_id < 0
 
+
+def mask_secret(value: str, keep_start: int = 2, keep_end: int = 2) -> str:
+    if not value:
+        return "<empty>"
+    if len(value) <= keep_start + keep_end:
+        return "*" * len(value)
+    return f"{value[:keep_start]}...{value[-keep_end:]}"
+
+
+def mask_phone(phone: str) -> str:
+    if not phone:
+        return "<empty>"
+    if len(phone) <= 6:
+        return "*" * len(phone)
+    return f"{phone[:3]}***{phone[-2:]}"
+
+
+def safe_config_log() -> str:
+    token_id = BOT_TOKEN.split(":", 1)[0] if ":" in BOT_TOKEN else "<invalid>"
+    return (
+        f"BOT_TOKEN_ID={token_id}, "
+        f"TARGET_CHAT_ID={TARGET_CHAT_ID}, "
+        f"USE_USERBOT_FOR_GROUP={USE_USERBOT_FOR_GROUP}, "
+        f"USERBOT_API_ID={USERBOT_API_ID}, "
+        f"USERBOT_API_HASH={mask_secret(USERBOT_API_HASH, 4, 4)}, "
+        f"USERBOT_PHONE={mask_phone(USERBOT_PHONE)}, "
+        f"USERBOT_SESSION={USERBOT_SESSION}"
+    )
+
+
 async def init_userbot():
     global user_client
     if not USE_USERBOT_FOR_GROUP:
+        print("Userbot отключен (USE_USERBOT_FOR_GROUP=false).")
         return
     if TelegramClient is None:
         print("Telethon не установлен. Установите telethon или отключите USE_USERBOT_FOR_GROUP.")
@@ -73,6 +104,13 @@ async def init_userbot():
     if USERBOT_API_ID == 0 or not USERBOT_API_HASH or not USERBOT_PHONE:
         print("Userbot не настроен. Заполните USERBOT_API_ID/USERBOT_API_HASH/USERBOT_PHONE.")
         return
+    session_file = f"{USERBOT_SESSION}.session"
+    print(
+        f"Проверка session-файла: {session_file} "
+        f"(exists={os.path.exists(session_file)})"
+    )
+    print("Инициализация userbot...")
+    print(f"Конфиг userbot: {safe_config_log()}")
     user_client = TelegramClient(USERBOT_SESSION, USERBOT_API_ID, USERBOT_API_HASH)
     await user_client.start(phone=USERBOT_PHONE)
     print("Userbot подключен и готов отправлять файлы в группы.")
@@ -282,6 +320,7 @@ def main():
     print("Запуск Telegram бота для обработки изображений...")
     if not BOT_TOKEN:
         raise RuntimeError("Не задан BOT_TOKEN. Укажите его в переменных окружения.")
+    print(f"Загруженная конфигурация: {safe_config_log()}")
     
     # Создаем приложение
     application = (
