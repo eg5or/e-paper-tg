@@ -1,0 +1,11 @@
+services:
+  epaper-processor:
+    build: .
+    container_name: epaper-processor
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./sessions:/app/sessions
+    working_dir: /app
+    command: python telegram_bot_processor.py
