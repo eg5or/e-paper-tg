@@ -73,6 +73,12 @@ export const api = {
     return json.queue;
   },
 
+  async delivered(): Promise<QueueItem[]> {
+    const res = await fetch("/api/panel/delivered", { credentials: "include" });
+    const json = await parseJson<{ ok: true; delivered: QueueItem[] }>(res);
+    return json.delivered;
+  },
+
   async sendText(payload: { deviceId: string; fromName: string; text: string }): Promise<void> {
     const res = await fetch("/api/panel/send/text", {
       method: "POST",

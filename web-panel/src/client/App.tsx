@@ -1,6 +1,7 @@
 import { api } from "@/api/client";
 import { AppTopBar } from "@/components/organisms/AppTopBar";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { DeliveredPage } from "@/pages/DeliveredPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { QueuePage } from "@/pages/QueuePage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -24,6 +25,7 @@ function ProtectedApp() {
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/queue" element={<QueuePage />} />
+          <Route path="/delivered" element={<DeliveredPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

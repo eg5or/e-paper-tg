@@ -169,6 +169,7 @@ void drawFooter(bool showCurrentTime);
 void updateFooterTimePartial();
 bool downloadAndDisplayImage(String url);
 void convertToMonochrome(uint8_t* imageData, int width, int height, int bytesPerPixel);
+String urlDecode(const String& in);
 
 void setup() {
   Serial.begin(115200);
@@ -359,7 +360,7 @@ void pollWebFallback() {
   }
 
   String cmdType = http.header("X-Cmd-Type");
-  String fromName = http.header("X-From");
+  String fromName = urlDecode(http.header("X-From"));
   if (fromName.length() == 0) fromName = "Web";
   String tsHeader = http.header("X-Timestamp");
   uint32_t timestamp = tsHeader.length() ? (uint32_t)tsHeader.toInt() : (uint32_t)time(nullptr);
@@ -394,6 +395,37 @@ void pollWebFallback() {
   Serial.print("WEB fallback: неизвестный тип команды: ");
   Serial.println(cmdType);
   http.end();
+}
+
+String urlDecode(const String& in) {
+  String out;
+  out.reserve(in.length());
+  for (size_t i = 0; i < in.length(); i++) {
+    char c = in[i];
+    if (c == '+') {
+      out += ' ';
+      continue;
+    }
+    if (c == '%' && i + 2 < in.length()) {
+      char h1 = in[i + 1];
+      char h2 = in[i + 2];
+      auto hexVal = [](char ch) -> int {
+        if (ch >= '0' && ch <= '9') return ch - '0';
+        if (ch >= 'A' && ch <= 'F') return ch - 'A' + 10;
+        if (ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
+        return -1;
+      };
+      int v1 = hexVal(h1);
+      int v2 = hexVal(h2);
+      if (v1 >= 0 && v2 >= 0) {
+        out += (char)((v1 << 4) | v2);
+        i += 2;
+        continue;
+      }
+    }
+    out += c;
+  }
+  return out;
 }
 
 // Функция для форматирования даты и времени из Unix timestamp

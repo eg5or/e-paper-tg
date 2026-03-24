@@ -22,4 +22,5 @@ export interface QueueItem {
   imageHeight: number | null;
   hasPreview: boolean;
   createdAt: number;
+  deliveredAt?: number | null;
 }

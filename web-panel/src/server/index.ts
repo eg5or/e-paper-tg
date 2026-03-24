@@ -144,6 +144,33 @@ app.get("/api/panel/queue", requireAuth, (_req, res) => {
   });
 });
 
+app.get("/api/panel/delivered", requireAuth, (_req, res) => {
+  void (async () => {
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        device_id AS "deviceId",
+        type,
+        from_name AS "fromName",
+        text_payload AS "textPayload",
+        image_width AS "imageWidth",
+        image_height AS "imageHeight",
+        (image_preview_png IS NOT NULL) AS "hasPreview",
+        created_at AS "createdAt",
+        delivered_at AS "deliveredAt"
+      FROM commands
+      WHERE status = 'delivered'
+      ORDER BY delivered_at DESC NULLS LAST, id DESC
+      LIMIT 500
+      `
+    );
+    res.json({ ok: true, delivered: result.rows });
+  })().catch((err) => {
+    res.status(500).json({ ok: false, message: err.message });
+  });
+});
+
 app.get("/api/panel/queue/:id/preview", requireAuth, (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id) || id <= 0) {
@@ -309,7 +336,8 @@ app.get("/api/device/pull", (req, res) => {
       res.setHeader("Cache-Control", "no-store");
       res.setHeader("X-Cmd-Id", String(cmd.id));
       res.setHeader("X-Cmd-Type", cmd.type);
-      res.setHeader("X-From", cmd.from_name || "Web");
+      // HTTP headers must be ASCII-safe; encode sender name for ESP decoding.
+      res.setHeader("X-From", encodeURIComponent(cmd.from_name || "Web"));
       res.setHeader("X-Timestamp", String(cmd.created_at));
 
       if (cmd.type === "text") {

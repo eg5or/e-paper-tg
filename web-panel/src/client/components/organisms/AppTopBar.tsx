@@ -18,6 +18,9 @@ export function AppTopBar({ onLogout }: AppTopBarProps) {
         <Button color="inherit" component={RouterLink} to="/queue">
           Очередь
         </Button>
+        <Button color="inherit" component={RouterLink} to="/delivered">
+          Отправленные
+        </Button>
         <Button color="inherit" component={RouterLink} to="/settings">
           Настройки
         </Button>
