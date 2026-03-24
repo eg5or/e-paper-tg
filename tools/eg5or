@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_E_PAPER_DIR="${APP_E_PAPER_DIR:-$HOME/e-paper-tg}"
+APP_SITE_DIR="${APP_SITE_DIR:-$HOME/eg5or-site}"
+APP_CADDY_DIR="${APP_CADDY_DIR:-$HOME/caddy-eg5or}"
+PAPER_ENV_FILE="${PAPER_ENV_FILE:-./web-panel/.env.web}"
+
+usage() {
+  cat <<'EOF'
+eg5or CLI
+
+Usage:
+  eg5or help
+  eg5or status <paper|site|caddy|all>
+  eg5or logs <paper|site|caddy|all> [tail]
+  eg5or restart <paper|site|caddy|all>
+  eg5or rebuild <paper|site|caddy|all>
+  eg5or deploy <paper|site|caddy|all>
+
+Commands:
+  status   Show docker compose status.
+  logs     Show logs (tail defaults to 200). For single service follows logs.
+  restart  Restart containers for target stack.
+  rebuild  Rebuild and restart stack (docker compose up -d --build).
+  deploy   git pull + rebuild.
+
+Targets:
+  paper    ~/e-paper-tg
+  site     ~/eg5or-site
+  caddy    ~/caddy-eg5or
+  all      Run command for all targets in order: caddy, site, paper.
+
+Install alias:
+  sudo ln -sf "$PWD/tools/eg5or" /usr/local/bin/eg5or
+EOF
+}
+
+run_compose() {
+  local target="$1"
+  shift
+
+  case "$target" in
+    paper)
+      (cd "$APP_E_PAPER_DIR" && docker compose --env-file "$PAPER_ENV_FILE" "$@")
+      ;;
+    site)
+      (cd "$APP_SITE_DIR" && docker compose "$@")
+      ;;
+    caddy)
+      (cd "$APP_CADDY_DIR" && docker compose "$@")
+      ;;
+    *)
+      echo "Unknown target: $target" >&2
+      exit 1
+      ;;
+  esac
+}
+
+run_deploy() {
+  local target="$1"
+  case "$target" in
+    paper) (cd "$APP_E_PAPER_DIR" && git pull && docker compose --env-file "$PAPER_ENV_FILE" up -d --build) ;;
+    site)  (cd "$APP_SITE_DIR" && git pull && docker compose up -d --build) ;;
+    caddy) (cd "$APP_CADDY_DIR" && git pull && docker compose up -d --build) ;;
+    *) echo "Unknown target: $target" >&2; exit 1 ;;
+  esac
+}
+
+if [[ $# -lt 1 ]]; then
+  usage
+  exit 1
+fi
+
+cmd="$1"
+target="${2:-}"
+tail_n="${3:-200}"
+
+if [[ "$cmd" == "help" || "$cmd" == "--help" || "$cmd" == "-h" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ -z "$target" ]]; then
+  echo "Target is required." >&2
+  usage
+  exit 1
+fi
+
+targets=("$target")
+if [[ "$target" == "all" ]]; then
+  targets=("caddy" "site" "paper")
+fi
+
+case "$cmd" in
+  status)
+    for t in "${targets[@]}"; do
+      echo "=== $t status ==="
+      run_compose "$t" ps
+    done
+    ;;
+  logs)
+    if [[ "$target" == "all" ]]; then
+      for t in "${targets[@]}"; do
+        echo "=== $t logs (tail $tail_n) ==="
+        run_compose "$t" logs --tail "$tail_n"
+      done
+    else
+      run_compose "$target" logs -f --tail "$tail_n"
+    fi
+    ;;
+  restart)
+    for t in "${targets[@]}"; do
+      echo "=== $t restart ==="
+      run_compose "$t" restart
+    done
+    ;;
+  rebuild)
+    for t in "${targets[@]}"; do
+      echo "=== $t rebuild ==="
+      if [[ "$t" == "paper" ]]; then
+        run_compose "$t" up -d --build
+      else
+        run_compose "$t" up -d --build
+      fi
+    done
+    ;;
+  deploy)
+    for t in "${targets[@]}"; do
+      echo "=== $t deploy ==="
+      run_deploy "$t"
+    done
+    ;;
+  *)
+    echo "Unknown command: $cmd" >&2
+    usage
+    exit 1
+    ;;
+esac

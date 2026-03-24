@@ -5,13 +5,20 @@ import type { Stats } from "@/types";
 interface StatsRowProps {
   stats: Stats;
   onPendingClick?: () => void;
+  onDeliveredClick?: () => void;
 }
 
-export function StatsRow({ stats, onPendingClick }: StatsRowProps) {
+export function StatsRow({ stats, onPendingClick, onDeliveredClick }: StatsRowProps) {
   const items = [
     { label: "Устройств", value: stats.devices },
-    { label: "В очереди", value: stats.pending, clickable: true },
-    { label: "Доставлено", value: stats.delivered }
+    { label: "В очереди", value: stats.pending, clickable: true, hint: "Открыть очередь", onClick: onPendingClick },
+    {
+      label: "Доставлено",
+      value: stats.delivered,
+      clickable: true,
+      hint: "Открыть отправленные",
+      onClick: onDeliveredClick
+    }
   ];
   return (
     <Box display="grid" gridTemplateColumns={{ xs: "1fr", md: "repeat(3, 1fr)" }} gap={2} mb={2}>
@@ -19,7 +26,7 @@ export function StatsRow({ stats, onPendingClick }: StatsRowProps) {
         <Box key={item.label}>
           {item.clickable ? (
             <ButtonBase
-              onClick={() => onPendingClick?.()}
+              onClick={() => item.onClick?.()}
               sx={{ display: "block", width: "100%", borderRadius: 2, textAlign: "left" }}
             >
               <PageCard sx={{ width: "100%" }}>
@@ -28,7 +35,7 @@ export function StatsRow({ stats, onPendingClick }: StatsRowProps) {
                 </Typography>
                 <Typography variant="h4">{item.value}</Typography>
                 <Typography variant="caption" color="primary.main">
-                  Открыть очередь
+                  {item.hint}
                 </Typography>
               </PageCard>
             </ButtonBase>

@@ -248,6 +248,32 @@ docker compose logs -f epaper-processor
 docker compose logs -f paper-web
 ```
 
+### 7.1 CLI helper `eg5or`
+
+В репозитории есть скрипт `tools/eg5or` для быстрого управления стеками:
+- `paper` (`~/e-paper-tg`)
+- `site` (`~/eg5or-site`)
+- `caddy` (`~/caddy-eg5or`)
+- `all` (все по очереди)
+
+Установка:
+
+```bash
+cd ~/e-paper-tg
+sudo ln -sf "$PWD/tools/eg5or" /usr/local/bin/eg5or
+```
+
+Примеры:
+
+```bash
+eg5or help
+eg5or status all
+eg5or restart paper
+eg5or rebuild paper
+eg5or deploy all
+eg5or logs paper 300
+```
+
 ## 8. Частые проблемы
 
 - `Current status is: DISABLED` у бота — в `@BotFather`: `/setprivacy` -> `Disable`.

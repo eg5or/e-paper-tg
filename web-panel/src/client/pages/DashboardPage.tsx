@@ -15,6 +15,7 @@ export function DashboardPage() {
   const refreshAfterSend = async () => {
     await queryClient.invalidateQueries({ queryKey: ["stats"] });
     await queryClient.invalidateQueries({ queryKey: ["queue"] });
+    await queryClient.invalidateQueries({ queryKey: ["delivered"] });
   };
 
   const devices = devicesQuery.data || [];
@@ -26,6 +27,9 @@ export function DashboardPage() {
         stats={stats}
         onPendingClick={() => {
           navigate("/queue");
+        }}
+        onDeliveredClick={() => {
+          navigate("/delivered");
         }}
       />
       <Box display="grid" gridTemplateColumns={{ xs: "1fr", md: "1fr 1fr" }} gap={2}>
