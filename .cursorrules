@@ -1,0 +1,7 @@
+When editing `e-paper-tg.ino`, always mirror relevant logic changes to `e-paper-tg.github.ino`.
+
+Requirements for `e-paper-tg.github.ino` sync:
+- Keep behavior/functionality identical to `e-paper-tg.ino`.
+- Replace all secrets with placeholders (`YOUR_*`).
+- Keep version and feature parity with the main sketch.
+- Ensure `e-paper-tg.github.ino` remains non-compiling in Arduino builds inside this folder (template-only file).

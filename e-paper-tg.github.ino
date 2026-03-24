@@ -1,3 +1,8 @@
+#if 0
+// Template-only file for GitHub publication.
+// Keep this file in sync with e-paper-tg.ino (with secrets replaced),
+// but do not compile it together with the main sketch.
+
 #define ENABLE_GxEPD2_GFX 0  // Важно для совместимости с U8g2
 
 // Версия скетча - обновляйте при каждом изменении
@@ -49,7 +54,7 @@ const unsigned long WEB_POLL_INTERVAL = 15 * 1000;     // 15 секунд
 // Для text body содержит UTF-8 текст.
 // Для image body содержит RAW|W|H|<binary>.
 const bool WEB_FALLBACK_ENABLED = true;
-const char* WEB_API_BASE_URL = "https://paper.example.com";
+const char* WEB_API_BASE_URL = "http://paper.example.com";
 const char* WEB_DEVICE_ID = "YOUR_DEVICE_ID";
 const char* WEB_DEVICE_API_KEY = "YOUR_DEVICE_API_KEY";
 
@@ -128,6 +133,10 @@ GxEPD2_BW<GxEPD2_420_GDEY042T81, GxEPD2_420_GDEY042T81::HEIGHT> display(GxEPD2_4
 U8G2_FOR_ADAFRUIT_GFX u8g2_for_adafruit_gfx;
 
 // EEPROM для сохранения данных (не нужна отдельная переменная)
+
+// Переиспользуемые HTTP-клиенты, чтобы не тратить лишнюю RAM на стек в poll.
+BearSSL::WiFiClientSecure webSecureClient;
+WiFiClient webPlainClient;
 
 // Переменные
 String lastMessage = "";
@@ -285,6 +294,14 @@ void loop() {
 void pollWebFallback() {
   if (WiFi.status() != WL_CONNECTED) return;
 
+  const bool isHttps = (strncmp(WEB_API_BASE_URL, "https://", 8) == 0);
+  size_t freeHeapBefore = ESP.getFreeHeap();
+  if (isHttps && freeHeapBefore < 26000) {
+    Serial.print("WEB fallback skipped: low heap for TLS: ");
+    Serial.println(freeHeapBefore);
+    return;
+  }
+
   String url = String(WEB_API_BASE_URL) +
                "/api/device/pull?device_id=" + WEB_DEVICE_ID +
                "&api_key=" + WEB_DEVICE_API_KEY;
@@ -295,13 +312,13 @@ void pollWebFallback() {
   http.setTimeout(12000);
 
   bool ok = false;
-  if (url.startsWith("https://")) {
-    BearSSL::WiFiClientSecure secureClient;
-    secureClient.setInsecure();  // Для простоты: без pinning сертификата
-    ok = http.begin(secureClient, url);
+  if (isHttps) {
+    // Минимальные TLS буферы для ESP8266.
+    webSecureClient.setBufferSizes(512, 512);
+    webSecureClient.setInsecure();  // Для простоты: без pinning сертификата
+    ok = http.begin(webSecureClient, url);
   } else {
-    WiFiClient plainClient;
-    ok = http.begin(plainClient, url);
+    ok = http.begin(webPlainClient, url);
   }
 
   if (!ok) {
@@ -318,6 +335,25 @@ void pollWebFallback() {
   if (code != 200) {
     Serial.print("WEB fallback HTTP error: ");
     Serial.println(code);
+    String errText = http.errorToString(code);
+    if (errText.length()) {
+      Serial.print("WEB fallback HTTP error text: ");
+      Serial.println(errText);
+    }
+    if (isHttps) {
+      char sslErr[128] = {0};
+      int sslCode = webSecureClient.getLastSSLError(sslErr, sizeof(sslErr));
+      Serial.print("WEB fallback SSL error code: ");
+      Serial.println(sslCode);
+      if (sslErr[0] != '\0') {
+        Serial.print("WEB fallback SSL error text: ");
+        Serial.println(sslErr);
+      }
+    }
+    Serial.print("WEB fallback free heap: ");
+    Serial.println(ESP.getFreeHeap());
+    Serial.print("WEB fallback URL: ");
+    Serial.println(url);
     http.end();
     return;
   }
@@ -1658,3 +1694,5 @@ bool displayImageFromFile(String from_name, uint32_t timestamp, uint16_t width, 
   Serial.println("Изображение из файла отображено!");
   return true;
 }
+
+#endif
