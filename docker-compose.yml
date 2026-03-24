@@ -1,4 +1,20 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: paper-postgres
+    restart: unless-stopped
+    env_file:
+      - ./web-panel/.env.web
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   epaper-processor:
     build: .
     container_name: epaper-processor
@@ -9,3 +25,24 @@ services:
       - ./sessions:/app/sessions
     working_dir: /app
     command: python telegram_bot_processor.py
+
+  paper-web:
+    build: ./web-panel
+    container_name: paper-web
+    restart: unless-stopped
+    env_file:
+      - ./web-panel/.env.web
+    environment:
+      DB_HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - default
+      - edge
+    ports:
+      - "${BACKEND_PORT:-3028}:${BACKEND_PORT:-3028}"
+
+networks:
+  edge:
+    external: true

@@ -111,7 +111,13 @@ async def init_userbot():
     )
     print("Инициализация userbot...")
     print(f"Конфиг userbot: {safe_config_log()}")
-    user_client = TelegramClient(USERBOT_SESSION, USERBOT_API_ID, USERBOT_API_HASH)
+    user_client = TelegramClient(
+        USERBOT_SESSION,
+        USERBOT_API_ID,
+        USERBOT_API_HASH,
+        lang_code="ru",
+        system_lang_code="ru-RU",
+    )
     await user_client.start(phone=USERBOT_PHONE)
     print("Userbot подключен и готов отправлять файлы в группы.")
 

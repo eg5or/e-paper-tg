@@ -1,0 +1,13 @@
+{
+  "devices": [
+    {
+      "id": "1",
+      "name": "home",
+      "apiKey": "e44044af91b99740dd6e52c100748f9f",
+      "enabled": true,
+      "createdAt": 1774355188
+    }
+  ],
+  "commands": [],
+  "nextCommandId": 1
+}

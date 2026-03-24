@@ -1,18 +1,19 @@
-# E-Paper Telegram Bot
+# E-Paper Control (Telegram + Web Fallback)
 
-Проект состоит из двух частей:
-- `e-paper-tg.ino` — прошивка ESP8266 + e-paper дисплея.
-- `telegram_bot_processor.py` — серверный бот, который принимает фото, конвертирует их в RAW-формат для e-paper и отправляет файл в Telegram.
+Проект поддерживает два канала доставки контента на устройство:
+- Telegram (как раньше, через `telegram_bot_processor.py` + Telethon при необходимости).
+- Web fallback (новый TypeScript сервис `paper-web` с формой отправки текста/картинки и API polling для ESP8266).
 
 ## Содержание
 
 - [1. Функционал системы](#1-функционал-системы)
 - [2. Как это работает](#2-как-это-работает)
 - [3. Прошивка Arduino (ESP8266)](#3-прошивка-arduino-esp8266)
-- [4. Установка серверного бота (Docker + Telethon)](#4-установка-серверного-бота-docker--telethon)
-- [5. Первая авторизация Telethon в Docker](#5-первая-авторизация-telethon-в-docker)
-- [6. Ежедневная эксплуатация и обновления](#6-ежедневная-эксплуатация-и-обновления)
-- [7. Частые проблемы](#7-частые-проблемы)
+- [4. Docker сервисы](#4-docker-сервисы)
+- [5. Telegram канал (как раньше)](#5-telegram-канал-как-раньше)
+- [6. Web fallback (новый канал)](#6-web-fallback-новый-канал)
+- [7. Эксплуатация и обновления](#7-эксплуатация-и-обновления)
+- [8. Частые проблемы](#8-частые-проблемы)
 
 ## 1. Функционал системы
 
@@ -20,6 +21,9 @@
 
 - Получает текстовые сообщения из Telegram и выводит на e-paper.
 - Получает файлы с изображениями в формате `.epd` (`RAW|W|H|<binary>`) и выводит их на экран.
+- Дополнительно опрашивает web API (`/api/device/pull`) и принимает:
+  - `text` в body,
+  - `image` в body (`RAW|W|H|<binary>`).
 - Сохраняет последнее состояние (текст/картинку) в памяти и восстанавливает после перезагрузки.
 - Показывает в футере:
   - текущее время/дату (через NTP),
@@ -33,13 +37,25 @@
 - Отправляет файл в целевой чат (`TARGET_CHAT_ID`) или обратно в исходный чат.
 - Может отправлять в группу через userbot (Telethon), если нужен обход ограничения Bot API.
 
+### На сервере (`web-panel`, TypeScript)
+
+- Страница с логином/паролем.
+- Страница отправки текста и изображения на конкретное устройство.
+- Страница настроек устройств (`device_id`, `api_key`, enabled).
+- Очередь команд и endpoint для устройства: `GET /api/device/pull?device_id=...&api_key=...`.
+
 ## 2. Как это работает
 
+Канал A (Telegram):
 1. Вы отправляете фото боту-обработчику.
-2. Серверный бот конвертирует фото в файл `epaper_img_*.epd`.
-3. Файл отправляется в нужный чат/группу.
-4. ESP8266-бот читает файл и рисует изображение на e-paper.
-5. Последний контент сохраняется и переживает перезапуск питания.
+2. Серверный бот конвертирует фото в `epaper_img_*.epd`.
+3. ESP8266 получает файл через Telegram и отображает.
+
+Канал B (Web fallback):
+1. Вы открываете web-панель (например `paper.eg5or.ru`).
+2. Выбираете устройство и отправляете текст/картинку.
+3. ESP8266 опрашивает `/api/device/pull` и получает команду.
+4. Команда отображается на дисплее.
 
 ## 3. Прошивка Arduino (ESP8266)
 
@@ -73,6 +89,11 @@
 - `botToken`
 - при необходимости `ALLOWED_USER_ID`
 - при необходимости `TIMEZONE_OFFSET`
+- web fallback настройки:
+  - `WEB_FALLBACK_ENABLED`
+  - `WEB_API_BASE_URL` (например `https://paper.eg5or.ru`)
+  - `WEB_DEVICE_ID`
+  - `WEB_DEVICE_API_KEY`
 
 ### 3.4 Заливка в плату
 
@@ -86,18 +107,39 @@
    - инициализацию дисплея,
    - старт Telegram-бота.
 
-## 4. Установка серверного бота (Docker + Telethon)
+## 4. Docker сервисы
 
-### 4.1 Подготовка сервера
+В `docker-compose.yml` поднимаются три сервиса:
+- `postgres` — основная БД для web-панели (устройства + очередь команд).
+- `epaper-processor` — Telegram image processor (Python).
+- `paper-web` — Web fallback панель и API для устройств (TypeScript).
+
+Подготовка:
 
 ```bash
 git clone <REPO_URL>
 cd e-paper-tg
 cp .env.example .env
-mkdir -p sessions
+cp .env.web.example .env.web
+mkdir -p sessions postgres-data
 ```
 
-### 4.2 Заполнение `.env`
+Запуск:
+
+```bash
+docker compose up -d --build
+```
+
+Логи:
+
+```bash
+docker compose logs -f epaper-processor
+docker compose logs -f paper-web
+```
+
+## 5. Telegram канал (как раньше)
+
+### 5.1 Заполнение `.env`
 
 Минимально:
 
@@ -119,19 +161,7 @@ USERBOT_PHONE=+79XXXXXXXXX
 USERBOT_SESSION=sessions/userbot_session
 ```
 
-### 4.3 Сборка и запуск
-
-```bash
-docker compose up -d --build
-```
-
-Логи:
-
-```bash
-docker compose logs -f epaper-processor
-```
-
-## 5. Первая авторизация Telethon в Docker
+### 5.2 Первая авторизация Telethon в Docker
 
 Если `USE_USERBOT_FOR_GROUP=true`, первый вход сделайте интерактивно:
 
@@ -156,7 +186,52 @@ ls -la sessions
 docker compose up -d --build
 ```
 
-## 6. Ежедневная эксплуатация и обновления
+## 6. Web fallback (новый канал)
+
+### 6.1 Настройка `.env.web`
+
+```env
+BACKEND_PORT=3028
+WEB_USERNAME=admin
+WEB_PASSWORD=change_me
+WEB_SESSION_SECRET=change_this_secret
+DATABASE_URL=postgresql://paper:change_me@postgres:5432/paper
+WEB_TARGET_WIDTH=400
+WEB_TARGET_HEIGHT=300
+WEB_MAX_OUTPUT_BYTES=20000
+```
+
+### 6.2 Первый запуск web-панели
+
+После `docker compose up -d --build` сервис доступен на:
+- `http://SERVER_IP:3028`
+
+Дальше через reverse proxy можно привязать к поддомену `paper.eg5or.ru`.
+
+### 6.2.1 Локальный запуск web-сервиса (для разработки UI)
+
+```bash
+cd web-panel
+npm install
+npm run dev
+```
+
+Локально будет:
+- Frontend (React): `http://localhost:5173`
+- Backend API: `http://localhost:3001`
+- DB для локалки можно поднять отдельным Postgres или использовать контейнер `postgres`.
+
+### 6.3 Настройка устройства в web-панели
+
+1. Откройте `/settings`.
+2. Добавьте устройство:
+   - `Device ID` (например `device-001`)
+   - `API Key` (случайная строка)
+   - `Enabled = true`
+3. Те же `Device ID` и `API Key` пропишите в `e-paper-tg.ino`
+   (`WEB_DEVICE_ID`, `WEB_DEVICE_API_KEY`).
+
+## 7. Эксплуатация и обновления
 
 Обновить сервер после изменений в GitHub:
 
@@ -170,14 +245,16 @@ docker compose up -d --build
 ```bash
 docker compose ps
 docker compose logs -f epaper-processor
+docker compose logs -f paper-web
 ```
 
-## 7. Частые проблемы
+## 8. Частые проблемы
 
 - `Current status is: DISABLED` у бота — в `@BotFather`: `/setprivacy` -> `Disable`.
 - Бот в группе не видит сообщение от другого бота — используйте режим Telethon (`USE_USERBOT_FOR_GROUP=true`).
 - Telethon просит логин на каждом старте — проверьте volume `./sessions:/app/sessions` и `USERBOT_SESSION=sessions/...`.
 - Контейнер не стартует — проверьте, что в `.env` задан `BOT_TOKEN`.
+- ESP не получает web-команды — проверьте `WEB_API_BASE_URL`, `WEB_DEVICE_ID`, `WEB_DEVICE_API_KEY` в прошивке и устройство в `/settings`.
 
 ## Безопасность
 

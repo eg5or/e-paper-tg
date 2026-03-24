@@ -12,12 +12,14 @@ __pycache__/
 .env
 .env.*
 !.env.example
+!.env.web.example
 e-paper-tg.ino
 *.session
 *.session-journal
 userbot_session*
 userbot_session.session
 sessions/
+postgres-data/
 
 # Local logs
 *.log
@@ -25,3 +27,7 @@ sessions/
 # Editor / IDE
 .vscode/
 .idea/
+
+# Web panel
+web-panel/node_modules/
+web-panel/dist/
